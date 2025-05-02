@@ -17,7 +17,8 @@ if password != "Rent2025":
 
 # ✅ Google Sheets auth
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+creds_dict = json.loads(st.secrets["GOOGLE_CREDS"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open("Rent Reminder Sheet").worksheet("RentBills")
 headers = sheet.row_values(1)
