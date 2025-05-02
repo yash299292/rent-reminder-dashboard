@@ -5,6 +5,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import os
 import subprocess
+import json
 
 # ✅ Use official rerun for Streamlit v1.40+
 do_rerun = st.rerun
@@ -15,10 +16,12 @@ if password != "Rent2025":
     st.warning("Access Denied")
     st.stop()
 
-# ✅ Google Sheets auth
+# ✅ Google Sheets auth using Streamlit secrets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(st.secrets["GOOGLE_CREDS"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    json.loads(st.secrets["GOOGLE_CREDS"]),
+    scope
+)
 client = gspread.authorize(creds)
 sheet = client.open("Rent Reminder Sheet").worksheet("RentBills")
 headers = sheet.row_values(1)
@@ -27,42 +30,40 @@ headers = sheet.row_values(1)
 if st.button("🔄 Refresh"):
     do_rerun()
 
-# 📨 Trigger rent reminder script
+# 📨 Trigger rent reminder script (for local use only)
 if st.button("📨 Send Rent Reminders Now"):
     with st.spinner("Sending reminders via rent_reminder_pdf.py..."):
         try:
-            subprocess.run(["python3", "/Users/nonijoysar/CronProjects/rent_reminder/rent_reminder_pdf.py"], check=True)
+            subprocess.run(["python3", "rent_reminder_pdf.py"], check=True)
             st.success("✅ Reminders sent successfully!")
             do_rerun()
         except Exception as e:
             st.error(f"❌ Failed to send reminders: {e}")
 
-# 🔽 Load tenant data
+# 📊 Load and filter tenant data
 records = sheet.get_all_records()
-
 st.title("🏠 Rent Reminder Dashboard")
 
-# 📅 Month Filter
+# 📅 Filter by month
 months_available = sorted(set(r["bill_month"] for r in records if r.get("bill_month")))
 selected_month = st.selectbox("📅 Filter by Month", ["All"] + months_available)
 
-# 🔍 Filter by Paid/Unpaid
+# 🔍 Filter by paid/unpaid
 status = st.selectbox("Filter by status", ["All", "PAID", "UNPAID"])
 
-# 📊 Paid vs Unpaid pie chart
+# 📊 Pie chart
 paid = sum(1 for r in records if r.get("paid", "").strip().upper() == "PAID")
 unpaid = len(records) - paid
 fig, ax = plt.subplots()
 ax.pie([paid, unpaid], labels=["Paid", "Unpaid"], autopct="%1.1f%%", colors=["green", "red"])
 st.pyplot(fig)
 
-# 🔎 Apply filters
-filtered = []
-for r in records:
-    paid_status = r.get("paid", "").strip().upper()
-    if ((status == "All") or (status == "PAID" and paid_status == "PAID") or (status == "UNPAID" and paid_status != "PAID")):
-        if selected_month == "All" or r["bill_month"] == selected_month:
-            filtered.append(r)
+# Apply filters
+filtered = [
+    r for r in records
+    if (status == "All" or r.get("paid", "").strip().upper() == status)
+    and (selected_month == "All" or r.get("bill_month") == selected_month)
+]
 
 st.write(f"Showing {len(filtered)} tenants")
 
@@ -89,10 +90,10 @@ for tenant in filtered:
             st.success(f"{tenant['tenant_name']} marked as PAID")
             do_rerun()
 
-    # 📁 Invoice PDF
+    # 📄 Invoice PDF (only works if available on deployment server)
     try:
         month_year = datetime.strptime(tenant['bill_month'], "%B %Y").strftime("%Y-%m")
-        pdf_folder = f"/Users/nonijoysar/Desktop/Rent collector/receipts/{month_year}"
+        pdf_folder = f"receipts/{month_year}"
         pdf_name = f"Rent_Bill_{tenant['tenant_name'].replace(' ', '_')}_{tenant['bill_month'].replace(' ', '_')}.pdf"
         pdf_path = os.path.join(pdf_folder, pdf_name)
 
