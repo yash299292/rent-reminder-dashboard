@@ -17,7 +17,7 @@ from email.mime.application import MIMEApplication
 do_rerun = st.rerun
 
 # 🔐 Password protection
-password = st.text_input("Enter admin password", type="password")
+password = st.text_input("Enter admin password", type="password", key="password_input")
 if password != "Rent2025":
     st.warning("Access Denied")
     st.stop()
@@ -134,27 +134,34 @@ if st.button("📨 Send Rent Reminders Now"):
         do_rerun()
 
 # 📊 Load and filter tenant data
+st.markdown("### 🏠 Rent Reminder Dashboard")
 records = sheet.get_all_records()
-st.title("🏠 Rent Reminder Dashboard")
 
+# Filter Options
 months_available = sorted(set(r["bill_month"] for r in records if r.get("bill_month")))
-selected_month = st.selectbox("📅 Filter by Month", ["All"] + months_available)
-status = st.selectbox("Filter by status", ["All", "PAID", "UNPAID"])
+selected_month = st.selectbox("📅 **Filter by Month**", ["All"] + months_available, key="month_filter")
+status = st.selectbox("📊 **Filter by status**", ["All", "PAID", "UNPAID"], key="status_filter")
 
+# Status Pie Chart
 paid = sum(1 for r in records if r.get("paid", "").strip().upper() == "PAID")
 unpaid = len(records) - paid
-fig, ax = plt.subplots()
-ax.pie([paid, unpaid], labels=["Paid", "Unpaid"], autopct="%1.1f%%", colors=["green", "red"])
+fig, ax = plt.subplots(figsize=(7, 7))
+ax.pie([paid, unpaid], labels=["Paid", "Unpaid"], autopct="%1.1f%%", colors=["#4CAF50", "#F44336"], startangle=90)
+ax.axis('equal')  # Equal aspect ratio ensures the pie chart is drawn as a circle.
 st.pyplot(fig)
 
+# Filtering Tenants
 filtered = [
     r for r in records
     if (status == "All" or r.get("paid", "").strip().upper() == status)
     and (selected_month == "All" or r.get("bill_month") == selected_month)
 ]
 
-st.write(f"Showing {len(filtered)} tenants")
+# Displaying Tenant Data in Table
+st.write(f"### Showing {len(filtered)} tenants")
+st.dataframe(filtered)
 
+# Displaying Detailed Data with Buttons
 for tenant in filtered:
     col1, col2, col3 = st.columns([3, 3, 2])
     current_status = tenant.get("paid", "").strip().upper()
@@ -186,8 +193,8 @@ for tenant in filtered:
     except Exception:
         col3.caption("📄 Invalid date format")
 
+# 📋 Reminder Log
 st.markdown("---")
-
 try:
     st.subheader("📋 Reminder Log")
     log_sheet = client.open("Rent Reminder Sheet").worksheet("Log")
