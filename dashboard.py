@@ -86,9 +86,14 @@ def send_email(data, pdf_path, is_follow_up=False):
         msg.attach(part)
 
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-        server.login(st.secrets['EMAIL'], st.secrets['EMAIL_PASS'])
-        server.sendmail(st.secrets['EMAIL'], data['email'], msg.as_string())
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(st.secrets['EMAIL'], st.secrets['EMAIL_PASS'])
+            server.sendmail(st.secrets['EMAIL'], data['email'], msg.as_string())
+        print(f"Reminder successfully sent to {data['email']}")
+    except Exception as e:
+        print(f"Error sending email to {data['email']}: {e}")
+        st.warning(f"Failed to send email to {data['email']}: {e}")
 
 # 🔄 Manual refresh
 if st.button("🔄 Refresh"):
@@ -122,6 +127,7 @@ if st.button("📨 Send Rent Reminders Now"):
                 row_index = records.index(row) + 2
                 sent_col = headers.index("sent_on") + 1
                 sheet.update_cell(row_index, sent_col, today.strftime("%Y-%m-%d"))
+                print(f"Updated sent_on for {row['tenant_name']} to {today.strftime('%Y-%m-%d')}")
             except Exception as e:
                 st.warning(f"Failed for {row['tenant_name']}: {e}")
         st.success("✅ All applicable reminders sent!")
